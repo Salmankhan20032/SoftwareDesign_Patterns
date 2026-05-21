@@ -1,10 +1,10 @@
-# Evolving System — Design Patterns Assignment
+# E-Commerce Cart — Design Patterns (Evolving System)
 
 **Selected topic: D — E-Commerce Cart**
 
-I chose this topic because discount rules are a clear real-world pain point: every new promotion type tends to land in one `if` block and breaks something else. The cart is easy to demo in React (catalog, line items, totals) while still giving a strong before/after story for Strategy and OCP in Phase 3.
+I chose this topic because discount rules are a clear real-world pain point: every new promotion type tends to land in one `if` block and breaks something else. The cart is easy to demo in React while showing a full evolution from naive code → Creational → Structural → Behavioral patterns.
 
-Discount and promotion logic is intentionally hardcoded inside the `Cart` class in Phase 0. That mirrors the assignment scenario: every new discount type forces you to edit existing cart code and risks regressions. This project evolves that design across three graded phases (Creational → Structural → Behavioral) using a React + TypeScript storefront.
+A React + TypeScript storefront that grew phase-by-phase from a **naive cart** (discounts hardcoded in one class) to an **extensible** design using Gang of Four patterns.
 
 ---
 
@@ -12,52 +12,109 @@ Discount and promotion logic is intentionally hardcoded inside the `Cart` class 
 
 | Phase | Branch | Status |
 |-------|--------|--------|
-| 0 — Naive baseline | `main` | Complete |
-| 1 — Creational | `phase-1` | Not started |
-| 2 — Structural | `phase-2` | Not started |
-| 3 — Behavioral | `phase-3` | Not started |
+| 0 — Naive baseline | `main` (history) | Complete |
+| 1 — Creational | `phase-1` | Complete |
+| 2 — Structural | `phase-2` | Complete |
+| 3 — Behavioral | `phase-3` | Complete |
+| **Final** | `main` | All phases merged |
+
+---
 
 ## What it does
 
-Simple e-commerce UI: browse a catalog, add items, set student/loyalty/coupon options, and see subtotal, discount, and total. All discount rules currently live in `src/domain/Cart.ts` (Phase 0 smell).
+- Browse a product catalog and add items to the cart  
+- Optional per-line **gift wrap** and **extended warranty** (Decorator)  
+- **Student**, **loyalty**, **coupon**, and **partner** promotions  
+- **Black Friday** toggle demonstrates **OCP** — new discount without editing old code  
+- **Undo** for add-item and student-discount actions (Command)  
+
+---
+
+## Design patterns used
+
+| Phase | Branch | Patterns |
+|-------|--------|----------|
+| 0 | `main` (baseline) | — |
+| 1 | `phase-1` | Factory Method, Builder |
+| 2 | `phase-2` | Decorator, Adapter |
+| 3 | `phase-3` | Strategy, Observer, Command |
+
+Details: [PATTERNS.md](./PATTERNS.md) · Problem analysis: [PROBLEMS.md](./PROBLEMS.md)
+
+---
+
+## Architecture (final)
+
+```mermaid
+flowchart TB
+    App[React App] --> Cart[Cart]
+    App --> Invoker[CommandInvoker]
+    App --> Hook[useCartObserver]
+    Cart --> Engine[DiscountEngine]
+    Engine --> Strategies[DiscountStrategy classes]
+    Cart --> Decorators[PricedLine Decorators]
+    App --> Adapter[LegacyPromoAdapter]
+    Builder[CartBuilder] --> Cart
+```
+
+Full diagram: [docs/diagrams/phase3-architecture.md](./docs/diagrams/phase3-architecture.md)
+
+---
 
 ## Run locally
 
 ```bash
 npm install
-npm run dev
+npm run dev      # http://localhost:5173
+npm run build    # production build
+npm test         # Vitest — discount engine / OCP tests
 ```
 
-Open the URL shown in the terminal (usually `http://localhost:5173`).
+---
 
-```bash
-npm run build   # production build
-npm run preview # preview production build
-```
-
-## Repository layout
+## Repository structure
 
 ```
 ├── README.md
-├── PATTERNS.md      # pattern documentation (updated each phase)
-├── PROBLEMS.md      # Phase 0 problem analysis
+├── PATTERNS.md
+├── PROBLEMS.md
 ├── src/
+│   ├── domain/          # Cart, Product
+│   ├── creational/      # Phase 1
+│   ├── structural/      # Phase 2
+│   ├── behavioral/      # Phase 3
+│   └── hooks/
 ├── docs/
 │   ├── diagrams/
 │   └── ai-log/
-└── .github/workflows/   # CI added in Phase 3
+└── .github/workflows/ci.yml
 ```
 
-## Patterns (planned)
+---
 
-| Phase | Planned patterns |
-|-------|------------------|
-| 1 | Factory Method (product / line creation) |
-| 2 | Decorator (add-ons), Adapter or Facade (external promo/checkout) |
-| 3 | Strategy (discounts), Observer + Command (OCP demo, undo, UI sync) |
+## Branches
 
-Details in [PATTERNS.md](./PATTERNS.md) as each phase lands.
+| Branch | Content |
+|--------|---------|
+| `main` | Merge target — final merged project |
+| `phase-1` | Creational patterns |
+| `phase-2` | + Structural patterns |
+| `phase-3` | + Behavioral patterns + CI |
 
-## License
+**Final merge:** `phase-3` merged into `main` (all patterns + CI live on `main`).
 
-Academic project — Software Design Patterns course 2025–2026.
+---
+
+## CI
+
+GitHub Actions runs on push/PR: `npm ci` → `npm run build` → `npm test`.
+
+---
+
+## AI usage
+
+Documented per phase in `docs/ai-log/phase1.md`, `phase2.md`, `phase3.md` (prompts, reflections, corrections).
+
+---
+
+Academic project — Software Design Patterns 2025–2026.
