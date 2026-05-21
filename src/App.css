@@ -21,6 +21,10 @@
   font-size: 0.95rem;
 }
 
+.header-actions {
+  margin-top: 0.75rem;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 1fr 1fr;

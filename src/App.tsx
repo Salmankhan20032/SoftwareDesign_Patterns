@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
+import { CommandInvoker } from './behavioral/command/CommandInvoker';
+import { AddItemCommand } from './behavioral/command/commands/AddItemCommand';
+import { SetStudentDiscountCommand } from './behavioral/command/commands/SetStudentDiscountCommand';
 import { CartBuilder } from './creational/CartBuilder';
 import type { CustomerTier, LineAddOn } from './domain/Cart';
 import { CATALOG } from './data/catalog';
+import { useCartObserver } from './hooks/useCartObserver';
 import { LegacyPromoAdapter } from './structural/adapter/LegacyPromoAdapter';
 import './App.css';
 
@@ -11,9 +15,11 @@ function formatMoney(value: number): string {
 
 export default function App() {
   const [cart] = useState(() => new CartBuilder().withCatalog(CATALOG).build());
-  const [, setTick] = useState(0);
+  const [invoker] = useState(() => new CommandInvoker());
   const [loadingPromos, setLoadingPromos] = useState(false);
-  const refresh = () => setTick((n) => n + 1);
+  const [undoHint, setUndoHint] = useState<string | null>(null);
+
+  useCartObserver(cart);
 
   const subtotal = useMemo(() => cart.getSubtotal(), [cart, cart.lines]);
   const discount = useMemo(
@@ -26,18 +32,23 @@ export default function App() {
       cart.couponCode,
       cart.activeExternalPromo,
       cart.externalPromotions,
+      cart.blackFridayEnabled,
     ],
   );
   const total = useMemo(() => cart.getTotal(), [cart, discount, subtotal]);
 
+  const runCommand = (command: Parameters<CommandInvoker['execute']>[0]) => {
+    invoker.execute(command);
+    setUndoHint(invoker.peekUndoLabel());
+  };
+
   const addToCart = (productId: string) => {
-    cart.addFromCatalog(productId, 1);
-    refresh();
+    const product = CATALOG.find((p) => p.id === productId);
+    runCommand(new AddItemCommand(cart, productId, 1, product?.name));
   };
 
   const toggleAddOn = (productId: string, addOn: LineAddOn) => {
     cart.addAddOn(productId, addOn);
-    refresh();
   };
 
   const loadPartnerPromos = async () => {
@@ -45,14 +56,28 @@ export default function App() {
     const adapter = new LegacyPromoAdapter();
     await cart.loadExternalPromotions(adapter);
     setLoadingPromos(false);
-    refresh();
+  };
+
+  const handleUndo = () => {
+    if (invoker.undo()) {
+      setUndoHint(invoker.peekUndoLabel());
+    } else {
+      setUndoHint(null);
+    }
   };
 
   return (
     <div className="app">
       <header className="header">
         <h1>E-Commerce Cart</h1>
-        <p className="subtitle">Phase 2 — Decorator (add-ons) + Adapter (partner promos)</p>
+        <p className="subtitle">
+          Phase 3 — Strategy (discounts) · Observer (UI sync) · Command (undo)
+        </p>
+        <div className="header-actions">
+          <button type="button" className="secondary" onClick={handleUndo} disabled={!invoker.canUndo()}>
+            Undo{undoHint ? `: ${undoHint}` : ''}
+          </button>
+        </div>
       </header>
 
       <main className="layout">
@@ -115,19 +140,9 @@ export default function App() {
                       type="number"
                       min={1}
                       value={line.getQuantity()}
-                      onChange={(e) => {
-                        cart.updateQuantity(line.productId, Number(e.target.value));
-                        refresh();
-                      }}
+                      onChange={(e) => cart.updateQuantity(line.productId, Number(e.target.value))}
                     />
-                    <button
-                      type="button"
-                      className="danger"
-                      onClick={() => {
-                        cart.removeItem(line.productId);
-                        refresh();
-                      }}
-                    >
+                    <button type="button" className="danger" onClick={() => cart.removeItem(line.productId)}>
                       Remove
                     </button>
                   </div>
@@ -141,22 +156,27 @@ export default function App() {
               <input
                 type="checkbox"
                 checked={cart.isStudent}
-                onChange={(e) => {
-                  cart.setStudentDiscount(e.target.checked);
-                  refresh();
-                }}
+                onChange={(e) =>
+                  runCommand(new SetStudentDiscountCommand(cart, e.target.checked))
+                }
               />
               Student discount
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                checked={cart.blackFridayEnabled}
+                onChange={(e) => (e.target.checked ? cart.enableBlackFriday() : cart.disableBlackFriday())}
+              />
+              Black Friday promo (OCP — new strategy class only)
             </label>
 
             <label>
               Loyalty tier
               <select
                 value={cart.customerTier}
-                onChange={(e) => {
-                  cart.setCustomerTier(e.target.value as CustomerTier);
-                  refresh();
-                }}
+                onChange={(e) => cart.setCustomerTier(e.target.value as CustomerTier)}
               >
                 <option value="standard">Standard</option>
                 <option value="silver">Silver</option>
@@ -171,8 +191,7 @@ export default function App() {
                 onChange={(e) => {
                   const code = e.target.value;
                   if (code) cart.applyCoupon(code);
-                  else cart.couponCode = null;
-                  refresh();
+                  else cart.clearCoupon();
                 }}
               >
                 <option value="">None</option>
@@ -184,18 +203,17 @@ export default function App() {
 
             <div className="partner-promos">
               <button type="button" className="secondary" onClick={loadPartnerPromos} disabled={loadingPromos}>
-                {loadingPromos ? 'Loading partner promos…' : 'Load partner promotions (Adapter)'}
+                {loadingPromos ? 'Loading partner promos…' : 'Load partner promotions'}
               </button>
               {cart.externalPromotions.length > 0 && (
                 <label>
-                  Partner promo (via Adapter)
+                  Partner promo
                   <select
                     value={cart.activeExternalPromo ?? ''}
                     onChange={(e) => {
                       const code = e.target.value;
                       if (code) cart.applyExternalPromo(code);
-                      else cart.activeExternalPromo = null;
-                      refresh();
+                      else cart.clearExternalPromo();
                     }}
                   >
                     <option value="">None</option>
@@ -209,14 +227,7 @@ export default function App() {
               )}
             </div>
 
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => {
-                cart.clear();
-                refresh();
-              }}
-            >
+            <button type="button" className="secondary" onClick={() => cart.clear()}>
               Clear cart
             </button>
           </div>
