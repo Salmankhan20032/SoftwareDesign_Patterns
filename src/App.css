@@ -56,11 +56,46 @@
 .catalog-item,
 .cart-line {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 0.75rem 0;
   border-bottom: 1px solid #eee;
+}
+
+.line-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+}
+
+.line-price {
+  font-weight: 600;
+}
+
+.addons {
+  font-size: 0.8rem;
+  color: #4f46e5;
+}
+
+.addons-row {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.addons-row label {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.partner-promos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-top: 1px dashed #ddd;
 }
 
 .catalog-item:last-child,

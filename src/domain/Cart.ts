@@ -1,23 +1,25 @@
 import type { ProductFactory } from '../creational/ProductFactory';
 import type { CartLineFactory } from '../creational/CartLineFactory';
+import type { ExternalPromotion, PromotionProvider } from '../structural/adapter/PromotionProvider';
+import { ExtendedWarrantyDecorator } from '../structural/decorator/ExtendedWarrantyDecorator';
+import { GiftWrapDecorator } from '../structural/decorator/GiftWrapDecorator';
+import type { PricedLine } from '../structural/decorator/PricedLine';
+import { BasePricedLine } from '../structural/decorator/BasePricedLine';
 import type { Product } from './Product';
 
-export interface CartLine {
-  product: Product;
-  quantity: number;
-}
-
 export type CustomerTier = 'standard' | 'silver' | 'gold';
+export type LineAddOn = 'gift-wrap' | 'warranty';
 
 /**
- * Cart stores lines and applies discounts.
- * Phase 1: product/line creation delegated to factories (no primitive addItem).
+ * Cart stores priced lines, applies discounts, and optional external promos (Phase 2).
  */
 export class Cart {
-  lines: CartLine[] = [];
+  lines: PricedLine[] = [];
   customerTier: CustomerTier = 'standard';
   isStudent = false;
   couponCode: string | null = null;
+  externalPromotions: ExternalPromotion[] = [];
+  activeExternalPromo: string | null = null;
 
   private readonly productFactory: ProductFactory;
   private readonly lineFactory: CartLineFactory;
@@ -31,9 +33,15 @@ export class Cart {
     const product = this.productFactory.createById(productId);
     if (!product) return false;
 
-    const existing = this.lines.find((line) => line.product.id === productId);
+    const existing = this.lines.find((line) => line.productId === productId);
+    if (existing && existing instanceof BasePricedLine) {
+      existing.setQuantity(existing.getQuantity() + quantity);
+      return true;
+    }
     if (existing) {
-      existing.quantity += quantity;
+      const baseQty = existing.getQuantity() + quantity;
+      this.lines = this.lines.filter((l) => l.productId !== productId);
+      this.lines.push(this.lineFactory.create(product, baseQty));
       return true;
     }
 
@@ -41,14 +49,39 @@ export class Cart {
     return true;
   }
 
+  addAddOn(productId: string, addOn: LineAddOn): void {
+    const index = this.lines.findIndex((line) => line.productId === productId);
+    if (index === -1) return;
+
+    let line = this.lines[index];
+    if (addOn === 'gift-wrap' && !line.getAddOnLabels().includes('Gift wrap')) {
+      line = new GiftWrapDecorator(line);
+    }
+    if (addOn === 'warranty' && !line.getAddOnLabels().includes('Extended warranty')) {
+      line = new ExtendedWarrantyDecorator(line);
+    }
+    this.lines[index] = line;
+  }
+
+  async loadExternalPromotions(provider: PromotionProvider): Promise<ExternalPromotion[]> {
+    this.externalPromotions = await provider.loadPromotions();
+    return this.externalPromotions;
+  }
+
+  applyExternalPromo(code: string): void {
+    const normalized = code.toUpperCase();
+    const found = this.externalPromotions.some((p) => p.code === normalized);
+    this.activeExternalPromo = found ? normalized : null;
+  }
+
   removeItem(productId: string): void {
-    this.lines = this.lines.filter((line) => line.product.id !== productId);
+    this.lines = this.lines.filter((line) => line.productId !== productId);
   }
 
   updateQuantity(productId: string, quantity: number): void {
-    const line = this.lines.find((l) => l.product.id === productId);
-    if (line) {
-      line.quantity = Math.max(1, quantity);
+    const line = this.lines.find((l) => l.productId === productId);
+    if (line instanceof BasePricedLine) {
+      line.setQuantity(quantity);
     }
   }
 
@@ -65,12 +98,37 @@ export class Cart {
   }
 
   getSubtotal(): number {
-    return this.lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
+    return this.lines.reduce((sum, line) => sum + line.getLineTotal(), 0);
+  }
+
+  calculateExternalPromoDiscount(): number {
+    if (!this.activeExternalPromo) return 0;
+    const promo = this.externalPromotions.find((p) => p.code === this.activeExternalPromo);
+    if (!promo) return 0;
+
+    const subtotal = this.getSubtotal();
+    let discount = 0;
+
+    if (promo.percentOff) {
+      if (promo.categories?.length) {
+        const eligible = this.lines
+          .filter((line) => promo.categories!.includes(line.getProduct().category))
+          .reduce((sum, line) => sum + line.getLineTotal(), 0);
+        discount += eligible * (promo.percentOff / 100);
+      } else {
+        discount += subtotal * (promo.percentOff / 100);
+      }
+    }
+
+    if (promo.flatOff) {
+      discount += promo.flatOff;
+    }
+
+    return Math.min(discount, subtotal);
   }
 
   /**
-   * All discount logic is hardcoded here — new rules require editing this method.
-   * (Addressed in Phase 3 with Strategy.)
+   * Discount logic still hardcoded — Strategy in Phase 3.
    */
   calculateDiscount(): number {
     const subtotal = this.getSubtotal();
@@ -80,7 +138,7 @@ export class Cart {
       discount += subtotal * 0.1;
     }
 
-    const totalQuantity = this.lines.reduce((sum, line) => sum + line.quantity, 0);
+    const totalQuantity = this.lines.reduce((sum, line) => sum + line.getQuantity(), 0);
     if (totalQuantity >= 5) {
       discount += subtotal * 0.15;
     }
@@ -95,17 +153,18 @@ export class Cart {
       discount += 10;
     } else if (this.couponCode === 'BOOKS5') {
       const bookTotal = this.lines
-        .filter((line) => line.product.category === 'books')
-        .reduce((sum, line) => sum + line.product.price * line.quantity, 0);
+        .filter((line) => line.getProduct().category === 'books')
+        .reduce((sum, line) => sum + line.getLineTotal(), 0);
       discount += bookTotal * 0.05;
     } else if (this.couponCode === 'FOOD-FLAT') {
       discount += 5;
     }
 
-    if (subtotal > 200 && this.lines.some((line) => line.product.category === 'electronics')) {
+    if (subtotal > 200 && this.lines.some((line) => line.getProduct().category === 'electronics')) {
       discount += 25;
     }
 
+    discount += this.calculateExternalPromoDiscount();
     return Math.min(discount, subtotal);
   }
 
@@ -116,12 +175,13 @@ export class Cart {
   getDiscountBreakdown(): string[] {
     const notes: string[] = [];
     if (this.isStudent) notes.push('Student: 10%');
-    const totalQuantity = this.lines.reduce((sum, line) => sum + line.quantity, 0);
+    const totalQuantity = this.lines.reduce((sum, line) => sum + line.getQuantity(), 0);
     if (totalQuantity >= 5) notes.push('Bulk (5+ items): 15%');
     if (this.customerTier === 'gold') notes.push('Gold loyalty: 20%');
     else if (this.customerTier === 'silver') notes.push('Silver loyalty: 5%');
     if (this.couponCode) notes.push(`Coupon: ${this.couponCode}`);
     if (this.getSubtotal() > 200) notes.push('Electronics over $200: $25 off');
+    if (this.activeExternalPromo) notes.push(`Partner promo: ${this.activeExternalPromo}`);
     return notes;
   }
 
@@ -130,5 +190,10 @@ export class Cart {
     this.couponCode = null;
     this.isStudent = false;
     this.customerTier = 'standard';
+    this.externalPromotions = [];
+    this.activeExternalPromo = null;
   }
 }
+
+// Re-export for components that need Product type on lines
+export type { Product };

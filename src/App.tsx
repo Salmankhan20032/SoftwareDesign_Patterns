@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { CartBuilder } from './creational/CartBuilder';
-import type { CustomerTier } from './domain/Cart';
+import type { CustomerTier, LineAddOn } from './domain/Cart';
 import { CATALOG } from './data/catalog';
+import { LegacyPromoAdapter } from './structural/adapter/LegacyPromoAdapter';
 import './App.css';
 
 function formatMoney(value: number): string {
@@ -11,12 +12,21 @@ function formatMoney(value: number): string {
 export default function App() {
   const [cart] = useState(() => new CartBuilder().withCatalog(CATALOG).build());
   const [, setTick] = useState(0);
+  const [loadingPromos, setLoadingPromos] = useState(false);
   const refresh = () => setTick((n) => n + 1);
 
   const subtotal = useMemo(() => cart.getSubtotal(), [cart, cart.lines]);
   const discount = useMemo(
     () => cart.calculateDiscount(),
-    [cart, cart.lines, cart.isStudent, cart.customerTier, cart.couponCode],
+    [
+      cart,
+      cart.lines,
+      cart.isStudent,
+      cart.customerTier,
+      cart.couponCode,
+      cart.activeExternalPromo,
+      cart.externalPromotions,
+    ],
   );
   const total = useMemo(() => cart.getTotal(), [cart, discount, subtotal]);
 
@@ -25,11 +35,24 @@ export default function App() {
     refresh();
   };
 
+  const toggleAddOn = (productId: string, addOn: LineAddOn) => {
+    cart.addAddOn(productId, addOn);
+    refresh();
+  };
+
+  const loadPartnerPromos = async () => {
+    setLoadingPromos(true);
+    const adapter = new LegacyPromoAdapter();
+    await cart.loadExternalPromotions(adapter);
+    setLoadingPromos(false);
+    refresh();
+  };
+
   return (
     <div className="app">
       <header className="header">
         <h1>E-Commerce Cart</h1>
-        <p className="subtitle">Phase 1 — Factory Method + Builder (discounts still in Cart)</p>
+        <p className="subtitle">Phase 2 — Decorator (add-ons) + Adapter (partner promos)</p>
       </header>
 
       <main className="layout">
@@ -61,17 +84,39 @@ export default function App() {
           ) : (
             <ul className="cart-lines">
               {cart.lines.map((line) => (
-                <li key={line.product.id} className="cart-line">
-                  <span>
-                    {line.product.name} × {line.quantity}
-                  </span>
-                  <div className="row">
+                <li key={line.productId} className="cart-line">
+                  <div className="line-info">
+                    <span>
+                      {line.getName()} × {line.getQuantity()}
+                    </span>
+                    <span className="line-price">{formatMoney(line.getLineTotal())}</span>
+                    {line.getAddOnLabels().length > 0 && (
+                      <span className="addons">{line.getAddOnLabels().join(', ')}</span>
+                    )}
+                  </div>
+                  <div className="row addons-row">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={line.getAddOnLabels().includes('Gift wrap')}
+                        onChange={() => toggleAddOn(line.productId, 'gift-wrap')}
+                      />
+                      Gift wrap
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={line.getAddOnLabels().includes('Extended warranty')}
+                        onChange={() => toggleAddOn(line.productId, 'warranty')}
+                      />
+                      Warranty
+                    </label>
                     <input
                       type="number"
                       min={1}
-                      value={line.quantity}
+                      value={line.getQuantity()}
                       onChange={(e) => {
-                        cart.updateQuantity(line.product.id, Number(e.target.value));
+                        cart.updateQuantity(line.productId, Number(e.target.value));
                         refresh();
                       }}
                     />
@@ -79,7 +124,7 @@ export default function App() {
                       type="button"
                       className="danger"
                       onClick={() => {
-                        cart.removeItem(line.product.id);
+                        cart.removeItem(line.productId);
                         refresh();
                       }}
                     >
@@ -120,7 +165,7 @@ export default function App() {
             </label>
 
             <label>
-              Coupon code
+              Local coupon
               <select
                 value={cart.couponCode ?? ''}
                 onChange={(e) => {
@@ -136,6 +181,33 @@ export default function App() {
                 <option value="FOOD-FLAT">FOOD-FLAT</option>
               </select>
             </label>
+
+            <div className="partner-promos">
+              <button type="button" className="secondary" onClick={loadPartnerPromos} disabled={loadingPromos}>
+                {loadingPromos ? 'Loading partner promos…' : 'Load partner promotions (Adapter)'}
+              </button>
+              {cart.externalPromotions.length > 0 && (
+                <label>
+                  Partner promo (via Adapter)
+                  <select
+                    value={cart.activeExternalPromo ?? ''}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      if (code) cart.applyExternalPromo(code);
+                      else cart.activeExternalPromo = null;
+                      refresh();
+                    }}
+                  >
+                    <option value="">None</option>
+                    {cart.externalPromotions.map((promo) => (
+                      <option key={promo.code} value={promo.code}>
+                        {promo.code} — {promo.description}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
 
             <button
               type="button"
