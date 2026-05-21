@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-
+tasarim_oruntuleri_odev.pdf
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

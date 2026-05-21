@@ -85,19 +85,34 @@ export class Cart {
     return true;
   }
 
-  addAddOn(productId: string, addOn: LineAddOn): void {
+  toggleAddOn(productId: string, addOn: LineAddOn): void {
     const index = this.lines.findIndex((line) => line.productId === productId);
     if (index === -1) return;
 
-    let line = this.lines[index];
-    if (addOn === 'gift-wrap' && !line.getAddOnLabels().includes('Gift wrap')) {
-      line = new GiftWrapDecorator(line);
-    }
-    if (addOn === 'warranty' && !line.getAddOnLabels().includes('Extended warranty')) {
-      line = new ExtendedWarrantyDecorator(line);
-    }
-    this.lines[index] = line;
+    const line = this.lines[index];
+    const labels = line.getAddOnLabels();
+    const hasGift = labels.includes('Gift wrap');
+    const hasWarranty = labels.includes('Extended warranty');
+
+    let wantGift = hasGift;
+    let wantWarranty = hasWarranty;
+    if (addOn === 'gift-wrap') wantGift = !hasGift;
+    if (addOn === 'warranty') wantWarranty = !hasWarranty;
+
+    this.lines[index] = this.buildLineWithAddOns(line.getProduct(), line.getQuantity(), wantGift, wantWarranty);
     this.touch();
+  }
+
+  private buildLineWithAddOns(
+    product: Product,
+    quantity: number,
+    giftWrap: boolean,
+    warranty: boolean,
+  ): PricedLine {
+    let line: PricedLine = new BasePricedLine(product, quantity);
+    if (giftWrap) line = new GiftWrapDecorator(line);
+    if (warranty) line = new ExtendedWarrantyDecorator(line);
+    return line;
   }
 
   async loadExternalPromotions(provider: PromotionProvider): Promise<ExternalPromotion[]> {
@@ -133,11 +148,17 @@ export class Cart {
   }
 
   updateQuantity(productId: string, quantity: number): void {
-    const line = this.lines.find((l) => l.productId === productId);
-    if (line instanceof BasePricedLine) {
-      line.setQuantity(quantity);
-      this.touch();
-    }
+    const index = this.lines.findIndex((l) => l.productId === productId);
+    if (index === -1) return;
+    const line = this.lines[index];
+    const labels = line.getAddOnLabels();
+    this.lines[index] = this.buildLineWithAddOns(
+      line.getProduct(),
+      quantity,
+      labels.includes('Gift wrap'),
+      labels.includes('Extended warranty'),
+    );
+    this.touch();
   }
 
   setStudentDiscount(enabled: boolean): void {
@@ -206,6 +227,9 @@ export class Cart {
     this.externalPromotions = [];
     this.activeExternalPromo = null;
     this.lastDiscountBreakdown = [];
+    if (this.blackFridayEnabled) {
+      this.disableBlackFriday();
+    }
     this.touch();
   }
 }

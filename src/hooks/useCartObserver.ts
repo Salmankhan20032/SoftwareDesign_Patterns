@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import type { CartObserver } from '../behavioral/observer/CartObserver';
 import type { Cart } from '../domain/Cart';
 
-/** Subscribes to cart Observer notifications — replaces manual refresh ticks. */
-export function useCartObserver(cart: Cart): void {
-  const [, setVersion] = useState(0);
+/** Subscribes to cart changes; returns version so derived totals re-render. */
+export function useCartObserver(cart: Cart): number {
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     const observer: CartObserver = {
@@ -13,4 +13,6 @@ export function useCartObserver(cart: Cart): void {
     cart.subscribe(observer);
     return () => cart.unsubscribe(observer);
   }, [cart]);
+
+  return version;
 }

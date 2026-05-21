@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import {
   Gift,
   Loader2,
@@ -14,6 +15,7 @@ import type { ExternalPromotion } from '../structural/adapter/PromotionProvider'
 import { formatMoney } from '../utils/format';
 
 interface CartPanelProps {
+  cartPanelRef?: RefObject<HTMLElement | null>;
   cart: Cart;
   subtotal: number;
   discount: number;
@@ -22,9 +24,11 @@ interface CartPanelProps {
   onStudentChange: (enabled: boolean) => void;
   onLoadPartnerPromos: () => void;
   onToggleAddOn: (productId: string, addOn: LineAddOn) => void;
+  onCheckout: () => void;
 }
 
 export function CartPanel({
+  cartPanelRef,
   cart,
   subtotal,
   discount,
@@ -33,11 +37,12 @@ export function CartPanel({
   onStudentChange,
   onLoadPartnerPromos,
   onToggleAddOn,
+  onCheckout,
 }: CartPanelProps) {
   const itemCount = cart.lines.reduce((n, l) => n + l.getQuantity(), 0);
 
   return (
-    <aside className="cart-panel">
+    <aside id="shopping-cart" className="cart-panel" ref={cartPanelRef}>
       <div className="cart-panel-inner">
         <div className="cart-panel-header">
           <Truck size={20} className="text-orange" />
@@ -73,7 +78,7 @@ export function CartPanel({
                       </div>
                     )}
                   </div>
-                  <strong className="cart-item-price">{formatMoney(line.getLineTotal())}</strong>
+                  <strong className="cart-item-price">${formatMoney(line.getLineTotal())}</strong>
                 </div>
                 <div className="cart-item-actions">
                   <label className="chip-toggle">
@@ -239,7 +244,12 @@ export function CartPanel({
               ))}
             </ul>
           )}
-          <button type="button" className="btn-checkout" disabled={cart.lines.length === 0}>
+          <button
+            type="button"
+            className="btn-checkout"
+            disabled={cart.lines.length === 0}
+            onClick={onCheckout}
+          >
             Proceed to checkout
           </button>
           <button type="button" className="btn-clear" onClick={() => cart.clear()}>

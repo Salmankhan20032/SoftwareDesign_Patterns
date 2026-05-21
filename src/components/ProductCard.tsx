@@ -6,9 +6,10 @@ import { formatPrice } from '../utils/format';
 interface ProductCardProps {
   product: Product;
   onAdd: (id: string) => void;
+  onQuickView?: (id: string) => void;
 }
 
-export function ProductCard({ product, onAdd }: ProductCardProps) {
+export function ProductCard({ product, onAdd, onQuickView }: ProductCardProps) {
   const meta = CATEGORY_META[product.category];
   const Icon = PRODUCT_ICONS[product.id] ?? meta.icon;
   const rating = PRODUCT_RATINGS[product.id] ?? { stars: 4.5, count: 100 };
@@ -21,7 +22,13 @@ export function ProductCard({ product, onAdd }: ProductCardProps) {
         <span className="product-category-pill">{meta.label}</span>
       </div>
       <div className="product-body">
-        <h3 className="product-title">{product.name}</h3>
+        <button
+          type="button"
+          className="product-title"
+          onClick={() => onQuickView?.(product.id)}
+        >
+          {product.name}
+        </button>
         <div className="product-rating">
           <div className="stars" aria-label={`${rating.stars} out of 5 stars`}>
             {Array.from({ length: 5 }).map((_, i) => (
