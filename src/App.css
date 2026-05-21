@@ -1,0 +1,164 @@
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: #1a1a2e;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: #5c5c7a;
+  font-size: 0.95rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 800px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e2e2ef;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 20px rgba(26, 26, 46, 0.06);
+}
+
+.panel h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.catalog,
+.cart-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.catalog-item,
+.cart-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.catalog-item:last-child,
+.cart-line:last-child {
+  border-bottom: none;
+}
+
+.muted {
+  display: block;
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: capitalize;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+button {
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #4338ca;
+}
+
+button.secondary {
+  background: #e8e8f4;
+  color: #333;
+}
+
+button.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+select,
+input[type='number'] {
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  max-width: 12rem;
+}
+
+.totals {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 2px solid #4f46e5;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+}
+
+.total-row.discount {
+  color: #059669;
+}
+
+.total-row.grand {
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin-top: 0.25rem;
+}
+
+.breakdown {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.empty {
+  color: #888;
+  font-style: italic;
+}
