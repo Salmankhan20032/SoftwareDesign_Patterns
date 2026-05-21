@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { CatalogProductFactory } from './creational/CatalogProductFactory';
+import { CartLineFactory } from './creational/CartLineFactory';
 import { Cart } from './domain/Cart';
 import type { CustomerTier } from './domain/Cart';
 import { CATALOG } from './data/catalog';
@@ -9,18 +11,21 @@ function formatMoney(value: number): string {
 }
 
 export default function App() {
-  const [cart] = useState(() => new Cart());
+  const [cart] = useState(
+    () => new Cart(new CatalogProductFactory(CATALOG), new CartLineFactory()),
+  );
   const [, setTick] = useState(0);
   const refresh = () => setTick((n) => n + 1);
 
   const subtotal = useMemo(() => cart.getSubtotal(), [cart, cart.lines]);
-  const discount = useMemo(() => cart.calculateDiscount(), [cart, cart.lines, cart.isStudent, cart.customerTier, cart.couponCode]);
+  const discount = useMemo(
+    () => cart.calculateDiscount(),
+    [cart, cart.lines, cart.isStudent, cart.customerTier, cart.couponCode],
+  );
   const total = useMemo(() => cart.getTotal(), [cart, discount, subtotal]);
 
   const addToCart = (productId: string) => {
-    const product = CATALOG.find((p) => p.id === productId);
-    if (!product) return;
-    cart.addItem(product.id, product.name, product.price, product.category, 1);
+    cart.addFromCatalog(productId, 1);
     refresh();
   };
 
@@ -28,7 +33,7 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1>E-Commerce Cart</h1>
-        <p className="subtitle">Phase 0 — naive implementation (discounts inside Cart)</p>
+        <p className="subtitle">Phase 1 — Factory Method (discounts still in Cart)</p>
       </header>
 
       <main className="layout">
@@ -136,7 +141,14 @@ export default function App() {
               </select>
             </label>
 
-            <button type="button" className="secondary" onClick={() => { cart.clear(); refresh(); }}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                cart.clear();
+                refresh();
+              }}
+            >
               Clear cart
             </button>
           </div>

@@ -1,4 +1,6 @@
-import type { Product, ProductCategory } from './Product';
+import type { ProductFactory } from '../creational/ProductFactory';
+import type { CartLineFactory } from '../creational/CartLineFactory';
+import type { Product } from './Product';
 
 export interface CartLine {
   product: Product;
@@ -8,8 +10,8 @@ export interface CartLine {
 export type CustomerTier = 'standard' | 'silver' | 'gold';
 
 /**
- * Phase 0 — intentionally naive cart.
- * Discount rules, product creation, and totals live in one class.
+ * Cart stores lines and applies discounts.
+ * Phase 1: product/line creation delegated to factories (no primitive addItem).
  */
 export class Cart {
   lines: CartLine[] = [];
@@ -17,22 +19,26 @@ export class Cart {
   isStudent = false;
   couponCode: string | null = null;
 
-  addItem(productId: string, name: string, price: number, category: ProductCategory, quantity: number): void {
+  private readonly productFactory: ProductFactory;
+  private readonly lineFactory: CartLineFactory;
+
+  constructor(productFactory: ProductFactory, lineFactory: CartLineFactory) {
+    this.productFactory = productFactory;
+    this.lineFactory = lineFactory;
+  }
+
+  addFromCatalog(productId: string, quantity = 1): boolean {
+    const product = this.productFactory.createById(productId);
+    if (!product) return false;
+
     const existing = this.lines.find((line) => line.product.id === productId);
     if (existing) {
       existing.quantity += quantity;
-      return;
+      return true;
     }
 
-    const product: Product = {
-      id: productId,
-      name,
-      price,
-      category,
-    };
-
-    this.lines.push({ product, quantity });
-    console.log(`[Cart] Added ${quantity}x ${name}`);
+    this.lines.push(this.lineFactory.create(product, quantity));
+    return true;
   }
 
   removeItem(productId: string): void {
@@ -64,6 +70,7 @@ export class Cart {
 
   /**
    * All discount logic is hardcoded here — new rules require editing this method.
+   * (Addressed in Phase 3 with Strategy.)
    */
   calculateDiscount(): number {
     const subtotal = this.getSubtotal();
@@ -93,8 +100,6 @@ export class Cart {
       discount += bookTotal * 0.05;
     } else if (this.couponCode === 'FOOD-FLAT') {
       discount += 5;
-    } else if (this.couponCode === 'INVALID') {
-      console.warn('[Cart] Unknown coupon — no discount applied');
     }
 
     if (subtotal > 200 && this.lines.some((line) => line.product.category === 'electronics')) {
