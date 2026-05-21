@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CatalogProductFactory } from './creational/CatalogProductFactory';
-import { CartLineFactory } from './creational/CartLineFactory';
-import { Cart } from './domain/Cart';
+import { CartBuilder } from './creational/CartBuilder';
 import type { CustomerTier } from './domain/Cart';
 import { CATALOG } from './data/catalog';
 import './App.css';
@@ -11,9 +9,7 @@ function formatMoney(value: number): string {
 }
 
 export default function App() {
-  const [cart] = useState(
-    () => new Cart(new CatalogProductFactory(CATALOG), new CartLineFactory()),
-  );
+  const [cart] = useState(() => new CartBuilder().withCatalog(CATALOG).build());
   const [, setTick] = useState(0);
   const refresh = () => setTick((n) => n + 1);
 
@@ -33,7 +29,7 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1>E-Commerce Cart</h1>
-        <p className="subtitle">Phase 1 — Factory Method (discounts still in Cart)</p>
+        <p className="subtitle">Phase 1 — Factory Method + Builder (discounts still in Cart)</p>
       </header>
 
       <main className="layout">
